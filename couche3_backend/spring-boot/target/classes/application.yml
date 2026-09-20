@@ -1,0 +1,49 @@
+server:
+  port: 8080
+
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/dms-adas2
+    username: postgres
+    password: "123"
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 2
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+    open-in-view: false
+    properties:
+      hibernate:
+        format_sql: false
+        jdbc:
+          time_zone: UTC
+
+jwt:
+  secret: AlphaTechnologyADASDMSPFE2025SecretKey256Bits!!
+  expiration: 86400000
+
+supabase:
+  url: https://oedgxwumddmfklalyiay.supabase.co
+  key: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9lZGd4d3VtZGRtZmtsYWx5aWF5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgyODU4MzcsImV4cCI6MjA5Mzg2MTgzN30.h_Mc_GapxZGxKF7hYP7lNfAyMe3Adu4hJnEXWyAA0ew
+  poll-interval-ms: 5000
+  tables:
+    evenements: evenements_bruts
+
+cors:
+  allowed-origins: "http://localhost:5173,http://localhost:3000"
+
+logging:
+  level:
+    tn.alphatechnology.adas: INFO
+    org.springframework.web.client: WARN
+    org.hibernate.SQL: WARN
+  charset:
+    console: UTF-8
+    file: UTF-8

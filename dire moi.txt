@@ -1,0 +1,124 @@
+Transition avant de commencer (depuis la page 10)
+
+« Maintenant que nous avons justifié nos choix techniques, je vais vous présenter la conception et la réalisation concrète du système, en commençant par l'architecture globale. »
+
+
+Page 11 — Architecture physique globale — Vue 3 couches
+
+
+
+« Notre système s'organise en trois couches. La première couche, la couche embarquée, regroupe tout ce qui se passe à bord du véhicule : les deux caméras DMS/ADAS, le Raspberry Pi 4 qui exécute les algorithmes de détection, la base SQLite locale pour le stockage temporaire, et le boîtier VEGEO d'Alpha Technology pour la connectivité GSM/GPRS. La deuxième couche est la couche backend et scoring : elle comprend Supabase PostgreSQL comme base de données centrale, la fonction Edge qui calcule le score de risque chaque nuit, et l'API REST Spring Boot sécurisée par JWT. La troisième couche est la couche applicative : une application web React 18 pour les gestionnaires de flotte et les administrateurs, et une application mobile Flutter pour les conducteurs.
+
+
+PAGE 12 — Diagramme de cas d'utilisation
+🔶 Avant d'afficher
+« Passons maintenant à la modélisation UML. Commençons par le diagramme de cas d'utilisation. »
+
+🔷 Sur la diapositive
+« Ce diagramme représente les interactions entre trois acteurs et le système.
+
+L'Administrateur gère les comptes des gestionnaires.
+
+Le gestionnaire de flotte consulte l'historique de ses conducteurs, gère les conducteurs et véhicules, gère sa flotte, et communique avec les conducteurs. 
+
+Le conducteur reçoit des alertes est étendu par six types d'alertes spécifiques — fatigue, distraction, ceinture, FCW, LDW et tabagisme — générées automatiquement par le système embarqué via le cas inclus Détecter événement. », consulte son score journalier, modifie ses informations personnelles, et consulte ses notifications.
+
+
+Toutes les fonctionnalités incluent une authentification préalable. 
+
+PAGE 13 — Diagramme de classes général
+🔶 Avant d'afficher
+Transition : « Maintenant que nous avons vu qui fait quoi, voyons comment les données sont structurées. »
+
+
+«  Ce diagramme de classes représente la structure statique de notre système. La classe abstraite Utilisateur est la racine de la hiérarchie, spécialisée en trois classes  : Administrateur, GestionnaireFlotte et Conducteur.
+
+Chaque conducteur est conduit un véhicule, qui est équipé d'un SystemeEmbarque. Ce système génère des Alertes, transmises via PPP au boîtier VEGEO. Chaque alerte est caractérisée par un type — l'énumération TypeAlerteEnum regroupe : FATIGUE, DISTRACTION, TELEPHONE, CEINTURE, TABAGISME, FCW et LDW — et une valeur de sévérité entière
+
+L'insertion d'une alerte déclenche automatiquement la création d'une Notification au conducteur concerné
+
+La messagerie bidirectionnelle entre gestionnaire et conducteur est assurée par la classe Message. »
+
+
+Page 14 — Module DMS : surveillance du conducteur
+
+
+Transition : « Rentrons maintenant dans le détail de la réalisation. Je commence par le module DMS qui surveille le comportement du conducteur en temps réel. »
+
+
+Ce que vous dites :
+
+Le module DMS utilise MediaPipe FaceMesh : 468 points faciaux 3D, avec une latence inférieure à 10 ms sur le Raspberry Pi.
+
+Trois catégories de détection :
+
+— Pour la fatigue : l'EAR mesure l'ouverture des yeux — seuil 0,22, 1 seconde pour la somnolence, 2 secondes pour les yeux fermés. Le MAR détecte les bâillements au-delà de 0,18. Le pitch ratio inférieur à 0,42 détecte la tête tombante.
+
+— Pour la distraction : le yaw ratio hors de [0,32 ; 0,68] pendant 1,5 seconde signale un regard dévié. YOLOv8n détecte le téléphone après 2 secondes continues.
+
+— Pour les comportements dangereux : FaceMesh combiné à MediaPipe Hands pour le tabagisme, et HSV plus Hough pour la ceinture non portée.
+
+Tous les seuils sont en secondes réelles .
+
+
+
+
+Page 15 — Module ADAS : FCW et LDW
+Avant : « Passons au module ADAS, qui surveille l'environnement routier. »
+Sur la slide :
+
+« Le FCW utilise YOLOv8n toutes les 150 millisecondes, limité au corridor central 40 à 60% de l'image. La décision repose sur une condition double : distance inférieure au seuil ET taux de rapprochement supérieur au seuil, calculé sur 8 échantillons. Ce choix élimine les fausses alertes en trafic arrêté, où le taux de rapprochement est nul.
+
+
+Le LDW utilise le pipeline Canny plus Hough, sans deep learning. L'alerte se déclenche au retour dans la voie après une dérive de 0,4 à 3 secondes — ce patron distingue la sortie involontaire du changement de voie
+
+
+Page 16 — Couche embarquée : Implémentation
+Avant : « Voici l'implémentation complète de la couche embarquée. »
+Sur la slide :
+
+« Le Raspberry Pi 4 tourne sous Python 3.11.9 avec démarrage automatique via systemd. L'architecture est multi-thread : Thread-DMS pour la caméra conducteur, Thread-ADAS pour la caméra route, Thread-Transmitter pour l'envoi réseau.
+
+
+La séquence de persistance est critique : chaque événement détecté est d'abord écrit en SQLite local avec le champ sent égal à zéro, garantissant la durabilité même en cas de coupure d'alimentation, puis placé en file d'attente pour transmission. Le Thread-Transmitter tente l'envoi HTTP POST vers Supabase avec un mécanisme de retry et backoff exponentiel : 3 tentatives avec des délais de 2 et 4 secondes. En cas d'échec total, l'événement reste en SQLite et sera retransmis au prochain démarrage.
+Le boîtier VEGEO d'Alpha Technology assure la connectivité via l'interface PPP configurée au niveau système d'exploitation. Depuis Python, la communication avec Supabase se fait simplement via la bibliothèque requests, de manière totalement transparente. »
+
+
+Page 17 — Backend Spring Boot, Supabase et scoring
+Avant : « Voyons maintenant comment les événements sont traités côté backend. »
+Sur la slide :
+
+« Spring Boot 3.2.5 assure l'authentification JWT signé par HMAC-SHA256 et expose 52 endpoints REST pour les trois rôles.
+
+À chaque insertion par le Raspberry Pi, le déclencheur Supabase trg_new_alerte réalise trois opérations automatiquement : résolution du conducteur depuis le matricule du véhicule, déduplication dans une fenêtre de ±2 secondes, et création de notification.
+
+Le score est calculé chaque nuit à 02h00 UTC par une Edge Function selon la formule : S_jour = min(100, 0,9 × S_hier + P_jour). Le facteur 0,9 signifie que sans alerte, le conducteur perd 10% de son score par jour.
+Quatre niveaux de risque : FAIBLE, MODÉRÉ, ÉLEVÉ, CRITIQUE. »
+
+
+Page 18 — Interfaces utilisateur
+Avant : « Ces données sont restituées aux utilisateurs via deux interfaces adaptées. »
+Sur la slide :
+
+« L'application web React 18 est destinée aux gestionnaires : tableau de bord avec KPIs, score coloré par conducteur mis à jour toutes les 30 secondes, carte GPS Leaflet, historique des alertes et messagerie interne.
+L'application mobile Flutter 3.22 est réservée aux conducteurs : jauge de score animée, carte des alertes GPS, notifications push et messagerie avec le gestionnaire synchronisée toutes les 15 secondes.
+La sécurité est garantie à chaque niveau par le cookie JWT httpOnly et l'isolation des données par rôle. »
+
+Page 19 — Validation et résultats
+Avant : « Je vais maintenant vous présenter les résultats de validation obtenus en conditions réelles. »
+Sur la slide :
+
+« Trois niveaux de validation. Tests unitaires : 100% conformes sur toutes les fonctions de calcul. Tests de détection : 190 scénarios réels, taux de détection global de 91,6%, latence embarquée moyenne de 92 millisecondes contre un objectif de 200, et 100% de détection pour la ceinture et le FCW_DANGER. Tests end-to-end : 52 endpoints Spring Boot validés à 100% via Postman, avec vérification des cas nominaux, des erreurs et de l'isolation des rôles. »
+
+
+Ce que nous avons appris & Perspectives
+Ce projet nous a apportés :
+Concevoir un système embarqué temps réel sous contraintes matérielles fortes (Raspberry Pi 4, ARM)
+Intégrer des modèles IA légers dans un pipeline multi-thread stable et fiable
+Maîtriser une chaîne complète : de la détection embarquée jusqu'aux interfaces utilisateur
+Collaborer en contexte industriel réel avec des exigences de production
+Ce que nous ajouterions :
+GPS temps réel intégré : enrichir chaque événement avec la position et la vitesse exactes (trames NMEA du boîtier VEGEO)
+YOLOv8n → TensorFlow Lite INT8 : gain de performance embarquée estimé à 20–30%
+Notifications push contextuelles : alertes critiques envoyées en temps réel au gestionnaire
+Déploiementsur flotte réelle : validation à grande échelle en conditions de production

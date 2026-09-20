@@ -1,0 +1,36 @@
+{
+  "detection": {
+    "conducteur_id"   : "C10",
+    "dms_cam_index"   : 0,
+    "adas_cam_index"  : 1,
+    "adas_video_path" : "",
+    "use_video"       : false
+  },
+  "sqlite": {
+    "db_path"           : "database/events.db",
+    "retention_jours"   : 10,
+    "cleanup_interval_h": 24
+  },
+  "supabase": {
+    "url" : "https://oedgxwumddmfklalyiay.supabase.co",
+    "key" : "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9lZGd4d3VtZGRtZmtsYWx5aWF5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgyODU4MzcsImV4cCI6MjA5Mzg2MTgzN30.h_Mc_GapxZGxKF7hYP7lNfAyMe3Adu4hJnEXWyAA0ew",
+    "table_evenements": "evenements_bruts",
+    "table_gps"       : "gps_logs_supabase"
+  },
+  "backend": {
+    "url"            : "http://localhost:8080",
+    "check_endpoint" : "/api/conducteurs/{id}/existe"
+  },
+  "gps_simulation": {
+    "lat_centre" : 36.8065,
+    "lon_centre" : 10.1815,
+    "rayon_km"   : 15.0,
+    "vitesse_min": 0.0,
+    "vitesse_max": 130.0
+  },
+  "sender": {
+    "intervalle_envoi_s": 5,
+    "batch_size"        : 20,
+    "retry_max"         : 3
+  }
+}

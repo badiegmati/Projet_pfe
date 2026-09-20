@@ -1,0 +1,7 @@
+opencv-python==4.9.0.80
+mediapipe==0.10.11
+ultralytics==8.1.47
+numpy==1.26.4
+supabase==1.2.0
+httpx==0.24.1
+requests==2.31.0
