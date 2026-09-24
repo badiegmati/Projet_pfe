@@ -4,10 +4,7 @@ import react from '@vitejs/plugin-react'
 
 export default defineConfig({
   plugins: [react()],
-  
-  // ✅ CORRECTION CRITIQUE
-  base: "/Projet_pfe/",
-  
+  base: '/Projet_pfe/',  // ✅ nom exact du repo
   server: {
     port: 5173,
     proxy: {
